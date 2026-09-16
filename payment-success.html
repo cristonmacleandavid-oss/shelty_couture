@@ -1,0 +1,9 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Payment | Shelty Couture</title><link rel="stylesheet" href="/css/styles.css"></head>
+<body class="success-page"><div class="success-card"><img src="/assets/shelty-logo.png" alt="Shelty Couture"><p class="eyebrow">ORDER UPDATE</p><h1 id="title">Checking your payment…</h1><p id="message">Please wait while we confirm your Paystack transaction.</p><a class="btn btn-primary" href="/">Return to Shelty Couture</a></div>
+<script>
+const p=new URLSearchParams(location.search),s=p.get("status"),r=p.get("reference");
+const title=document.getElementById("title"),msg=document.getElementById("message");
+if(s==="success"){title.textContent="Payment successful.";msg.textContent=`Thank you. Your order reference is ${r||"confirmed"}. Shelty Couture will contact you with the next steps.`}
+else if(s==="pending"){title.textContent="Payment pending.";msg.textContent="Your payment is still being processed. Keep your order reference and contact Shelty Couture if needed."}
+else{title.textContent="Payment not confirmed.";msg.textContent="We could not confirm this payment yet. Please contact Shelty Couture before making another payment."}
+</script></body></html>

@@ -1,0 +1,7 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Shelty Couture Admin</title><link rel="stylesheet" href="/css/admin.css"></head>
+<body>
+<div id="login-view" class="login-view"><div class="login-card"><img src="/assets/shelty-logo.png" alt="Shelty Couture"><p class="eyebrow">ATELIER ADMIN</p><h1>Welcome back.</h1><form id="login-form"><input name="email" type="email" placeholder="Admin email" required><input name="password" type="password" placeholder="Password" required><button>Sign in</button><p id="login-error"></p></form></div></div>
+<div id="app-view" class="admin-app hidden">
+<aside><div class="admin-logo-wrap"><img src="/assets/shelty-logo.png" alt="Shelty Couture"></div><nav><button data-view="dashboard">Dashboard</button><button data-view="products">Products</button><button data-view="orders">Orders</button><button data-view="appointments">Appointments</button><button data-view="tailoring">Custom Requests</button><button data-view="students">Student Applications</button></nav><button id="logout" class="logout">Sign out</button></aside>
+<main><header><div><p class="eyebrow">SHELTY COUTURE</p><h1 id="view-title">Dashboard</h1></div><a href="/" target="_blank">View website ↗</a></header><div id="content"></div></main></div>
+<script src="/js/admin.js"></script></body></html>
