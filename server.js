@@ -15,10 +15,12 @@ const PORT = process.env.PORT || 3000;
 
 const LOCAL_MODE = !process.env.DATABASE_URL;
 
-const JWT_SECRET = process.env.JWT_SECRET || "dev-only-change-me";
+const JWT_SECRET =
+  process.env.JWT_SECRET || "dev-only-change-me";
 
 const PUBLIC_URL =
-  process.env.PUBLIC_URL || `http://localhost:${PORT}`;
+  process.env.PUBLIC_URL ||
+  `http://localhost:${PORT}`;
 
 let pool;
 
@@ -43,7 +45,10 @@ if (LOCAL_MODE) {
 } else {
   pool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: !process.env.DATABASE_URL.includes("localhost")
+
+    ssl: !process.env.DATABASE_URL.includes(
+      "localhost"
+    )
       ? { rejectUnauthorized: false }
       : false
   });
@@ -51,31 +56,40 @@ if (LOCAL_MODE) {
 
 /* =========================================================
    EXPRESS
+   LARGE PAYLOAD SUPPORT
 ========================================================= */
 
 app.use(
   express.json({
+    limit: "1gb",
+
     verify: (req, res, buf) => {
       req.rawBody = buf;
     }
   })
 );
 
-app.use(express.urlencoded({ extended: true }));
+app.use(
+  express.urlencoded({
+    extended: true,
+    limit: "1gb"
+  })
+);
 
 /* =========================================================
    IMAGE UPLOAD
+   NO MULTER FILE SIZE LIMIT
 ========================================================= */
 
 const upload = multer({
   storage: multer.memoryStorage(),
 
-  limits: {
-    fileSize: 5 * 1024 * 1024
-  },
-
   fileFilter: (req, file, cb) => {
-    if (/^image\/(jpeg|png|webp|gif)$/.test(file.mimetype)) {
+    if (
+      /^image\/(jpeg|png|webp|gif)$/.test(
+        file.mimetype
+      )
+    ) {
       return cb(null, true);
     }
 
@@ -92,14 +106,19 @@ const upload = multer({
 ========================================================= */
 
 app.use(
-  express.static(path.join(__dirname, "public"))
+  express.static(
+    path.join(__dirname, "public")
+  )
 );
 
 /* =========================================================
    DATABASE HELPER
 ========================================================= */
 
-async function query(text, params = []) {
+async function query(
+  text,
+  params = []
+) {
   return pool.query(text, params);
 }
 
@@ -205,9 +224,11 @@ async function initDb() {
 
   if (
     !LOCAL_MODE &&
-    (!process.env.JWT_SECRET ||
+    (
+      !process.env.JWT_SECRET ||
       !process.env.ADMIN_EMAIL ||
-      !process.env.ADMIN_PASSWORD)
+      !process.env.ADMIN_PASSWORD
+    )
   ) {
     throw new Error(
       "Production requires DATABASE_URL, ADMIN_EMAIL, ADMIN_PASSWORD and JWT_SECRET."
@@ -233,7 +254,10 @@ async function initDb() {
   }
 
   const existing = await query(
-    "SELECT id FROM admins WHERE LOWER(email) = $1 LIMIT 1",
+    `SELECT id
+     FROM admins
+     WHERE LOWER(email) = $1
+     LIMIT 1`,
     [adminEmail]
   );
 
@@ -247,7 +271,10 @@ async function initDb() {
       `INSERT INTO admins
        (email, password_hash)
        VALUES ($1, $2)`,
-      [adminEmail, hash]
+      [
+        adminEmail,
+        hash
+      ]
     );
 
     console.log(
@@ -276,10 +303,13 @@ async function initDb() {
   ======================================================= */
 
   const count = await query(
-    "SELECT COUNT(*)::int AS count FROM products"
+    `SELECT COUNT(*)::int AS count
+     FROM products`
   );
 
-  if (count.rows[0].count === 0) {
+  if (
+    count.rows[0].count === 0
+  ) {
     const samples = [
       [
         "Emerald Signature Gown",
@@ -368,12 +398,15 @@ async function initDb() {
           featured,
           stock
         )
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+        VALUES
+        ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
         p
       );
     }
 
-    console.log("Sample products loaded.");
+    console.log(
+      "Sample products loaded."
+    );
   }
 }
 
@@ -381,30 +414,38 @@ async function initDb() {
    AUTHENTICATION
 ========================================================= */
 
-function authRequired(req, res, next) {
+function authRequired(
+  req,
+  res,
+  next
+) {
   const header =
     req.headers.authorization || "";
 
-  const token = header.startsWith("Bearer ")
-    ? header.slice(7)
-    : null;
+  const token =
+    header.startsWith("Bearer ")
+      ? header.slice(7)
+      : null;
 
   if (!token) {
     return res.status(401).json({
-      error: "Authentication required"
+      error:
+        "Authentication required"
     });
   }
 
   try {
-    req.admin = jwt.verify(
-      token,
-      JWT_SECRET
-    );
+    req.admin =
+      jwt.verify(
+        token,
+        JWT_SECRET
+      );
 
     next();
   } catch {
     return res.status(401).json({
-      error: "Invalid or expired session"
+      error:
+        "Invalid or expired session"
     });
   }
 }
@@ -428,32 +469,39 @@ async function paystack(
   pathname,
   options = {}
 ) {
-  if (!process.env.PAYSTACK_SECRET_KEY) {
+  if (
+    !process.env.PAYSTACK_SECRET_KEY
+  ) {
     throw new Error(
       "PAYSTACK_SECRET_KEY is not configured"
     );
   }
 
-  const response = await fetch(
-    `https://api.paystack.co${pathname}`,
-    {
-      ...options,
+  const response =
+    await fetch(
+      `https://api.paystack.co${pathname}`,
+      {
+        ...options,
 
-      headers: {
-        Authorization:
-          `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+        headers: {
+          Authorization:
+            `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
 
-        "Content-Type":
-          "application/json",
+          "Content-Type":
+            "application/json",
 
-        ...(options.headers || {})
+          ...(options.headers || {})
+        }
       }
-    }
-  );
+    );
 
-  const data = await response.json();
+  const data =
+    await response.json();
 
-  if (!response.ok || !data.status) {
+  if (
+    !response.ok ||
+    !data.status
+  ) {
     throw new Error(
       data.message ||
         "Paystack request failed"
@@ -475,8 +523,10 @@ app.get(
 
       res.json({
         ok: true,
-        service: "Shelty Couture",
-        database: "connected"
+        service:
+          "Shelty Couture",
+        database:
+          "connected"
       });
     } catch (e) {
       res.status(503).json({
@@ -547,7 +597,9 @@ app.get(
         clothing_type &&
         clothing_type !== "All"
       ) {
-        params.push(clothing_type);
+        params.push(
+          clothing_type
+        );
 
         where.push(
           `clothing_type = $${params.length}`
@@ -555,7 +607,9 @@ app.get(
       }
 
       if (search) {
-        params.push(`%${search}%`);
+        params.push(
+          `%${search}%`
+        );
 
         where.push(
           `(name ILIKE $${params.length}
@@ -563,21 +617,29 @@ app.get(
         );
       }
 
-      if (featured === "true") {
+      if (
+        featured === "true"
+      ) {
         where.push(
           "featured = TRUE"
         );
       }
 
-      const result = await query(
-        `SELECT *
-         FROM products
-         WHERE ${where.join(" AND ")}
-         ORDER BY featured DESC, created_at DESC`,
-        params
-      );
+      const result =
+        await query(
+          `SELECT *
+           FROM products
+           WHERE ${where.join(
+             " AND "
+           )}
+           ORDER BY featured DESC,
+                    created_at DESC`,
+          params
+        );
 
-      res.json(result.rows);
+      res.json(
+        result.rows
+      );
     } catch (e) {
       console.error(
         "Products error:",
@@ -585,7 +647,8 @@ app.get(
       );
 
       res.status(500).json({
-        error: "Unable to load products."
+        error:
+          "Unable to load products."
       });
     }
   }
@@ -595,24 +658,31 @@ app.get(
   "/api/products/:id",
   async (req, res) => {
     try {
-      const result = await query(
-        `SELECT *
-         FROM products
-         WHERE id = $1
-         AND active = TRUE`,
-        [req.params.id]
-      );
+      const result =
+        await query(
+          `SELECT *
+           FROM products
+           WHERE id = $1
+           AND active = TRUE`,
+          [req.params.id]
+        );
 
-      if (!result.rowCount) {
+      if (
+        !result.rowCount
+      ) {
         return res.status(404).json({
-          error: "Product not found"
+          error:
+            "Product not found"
         });
       }
 
-      res.json(result.rows[0]);
+      res.json(
+        result.rows[0]
+      );
     } catch (e) {
       res.status(500).json({
-        error: "Unable to load product."
+        error:
+          "Unable to load product."
       });
     }
   }
@@ -650,33 +720,36 @@ app.post(
         });
       }
 
-      const result = await query(
-        `INSERT INTO appointments
-        (
-          name,
-          email,
-          phone,
-          service,
-          appointment_date,
-          appointment_time,
-          message
-        )
-        VALUES ($1,$2,$3,$4,$5,$6,$7)
-        RETURNING id`,
-        [
-          name,
-          email,
-          phone,
-          service,
-          appointment_date,
-          appointment_time,
-          message || ""
-        ]
-      );
+      const result =
+        await query(
+          `INSERT INTO appointments
+          (
+            name,
+            email,
+            phone,
+            service,
+            appointment_date,
+            appointment_time,
+            message
+          )
+          VALUES
+          ($1,$2,$3,$4,$5,$6,$7)
+          RETURNING id`,
+          [
+            name,
+            email,
+            phone,
+            service,
+            appointment_date,
+            appointment_time,
+            message || ""
+          ]
+        );
 
       res.status(201).json({
         success: true,
-        id: result.rows[0].id
+        id:
+          result.rows[0].id
       });
     } catch (e) {
       console.error(e);
@@ -750,40 +823,42 @@ app.post(
         });
       }
 
-      const result = await query(
-        `INSERT INTO student_applications
-        (
-          full_name,
-          gender,
-          email,
-          phone,
-          city,
-          duration,
-          program,
-          experience,
-          start_date,
-          message
-        )
-        VALUES
-        ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-        RETURNING id`,
-        [
-          full_name,
-          gender,
-          email,
-          phone,
-          city || "",
-          duration,
-          program,
-          experience || "",
-          start_date || "",
-          message || ""
-        ]
-      );
+      const result =
+        await query(
+          `INSERT INTO student_applications
+          (
+            full_name,
+            gender,
+            email,
+            phone,
+            city,
+            duration,
+            program,
+            experience,
+            start_date,
+            message
+          )
+          VALUES
+          ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+          RETURNING id`,
+          [
+            full_name,
+            gender,
+            email,
+            phone,
+            city || "",
+            duration,
+            program,
+            experience || "",
+            start_date || "",
+            message || ""
+          ]
+        );
 
       res.status(201).json({
         success: true,
-        id: result.rows[0].id
+        id:
+          result.rows[0].id
       });
     } catch (e) {
       console.error(e);
@@ -829,40 +904,42 @@ app.post(
         });
       }
 
-      const result = await query(
-        `INSERT INTO tailoring_requests
-        (
-          name,
-          email,
-          phone,
-          garment_type,
-          occasion,
-          preferred_date,
-          budget,
-          measurements,
-          fabric,
-          message
-        )
-        VALUES
-        ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-        RETURNING id`,
-        [
-          name,
-          email,
-          phone,
-          garment_type,
-          occasion || "",
-          preferred_date || "",
-          budget || "",
-          measurements || "",
-          fabric || "",
-          message || ""
-        ]
-      );
+      const result =
+        await query(
+          `INSERT INTO tailoring_requests
+          (
+            name,
+            email,
+            phone,
+            garment_type,
+            occasion,
+            preferred_date,
+            budget,
+            measurements,
+            fabric,
+            message
+          )
+          VALUES
+          ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+          RETURNING id`,
+          [
+            name,
+            email,
+            phone,
+            garment_type,
+            occasion || "",
+            preferred_date || "",
+            budget || "",
+            measurements || "",
+            fabric || "",
+            message || ""
+          ]
+        );
 
       res.status(201).json({
         success: true,
-        id: result.rows[0].id
+        id:
+          result.rows[0].id
       });
     } catch (e) {
       console.error(e);
@@ -906,7 +983,9 @@ app.post(
       const requestedIds = [
         ...new Set(
           items
-            .map(item => Number(item.id))
+            .map(item =>
+              Number(item.id)
+            )
             .filter(
               Number.isInteger
             )
@@ -951,14 +1030,18 @@ app.post(
 
       const validatedItems = [];
 
-      for (const item of items) {
+      for (
+        const item of items
+      ) {
         const product =
           productsById.get(
             Number(item.id)
           );
 
         const quantity =
-          Number(item.quantity);
+          Number(
+            item.quantity
+          );
 
         if (
           !product ||
@@ -975,7 +1058,9 @@ app.post(
         }
 
         if (
-          Number(product.price) <= 0
+          Number(
+            product.price
+          ) <= 0
         ) {
           return res.status(400).json({
             error:
@@ -984,8 +1069,9 @@ app.post(
         }
 
         if (
-          Number(product.stock) <
-          quantity
+          Number(
+            product.stock
+          ) < quantity
         ) {
           return res.status(400).json({
             error:
@@ -998,19 +1084,27 @@ app.post(
           quantity;
 
         validatedItems.push({
-          id: Number(product.id),
-          name: product.name,
-          price: Number(
-            product.price
-          ),
+          id:
+            Number(product.id),
+
+          name:
+            product.name,
+
+          price:
+            Number(
+              product.price
+            ),
+
           image_url:
             item.image_url || "",
+
           quantity
         });
       }
 
       if (
-        Number(amount) !== expected ||
+        Number(amount) !==
+          expected ||
         expected <= 0
       ) {
         return res.status(400).json({
@@ -1076,44 +1170,49 @@ app.post(
             {
               method: "POST",
 
-              body: JSON.stringify({
-                email:
-                  customer.email,
+              body:
+                JSON.stringify({
+                  email:
+                    customer.email,
 
-                amount:
-                  String(
-                    expected * 100
-                  ),
+                  amount:
+                    String(
+                      expected * 100
+                    ),
 
-                currency: "GHS",
+                  currency: "GHS",
 
-                reference,
+                  reference,
 
-                callback_url:
-                  `${PUBLIC_URL}/api/paystack/callback`,
+                  callback_url:
+                    `${PUBLIC_URL}/api/paystack/callback`,
 
-                metadata: {
-                  custom_fields: [
-                    {
-                      display_name:
-                        "Customer",
-                      variable_name:
-                        "customer",
-                      value:
-                        customer.name
-                    },
+                  metadata: {
+                    custom_fields: [
+                      {
+                        display_name:
+                          "Customer",
 
-                    {
-                      display_name:
-                        "Phone",
-                      variable_name:
-                        "phone",
-                      value:
-                        customer.phone
-                    }
-                  ]
-                }
-              })
+                        variable_name:
+                          "customer",
+
+                        value:
+                          customer.name
+                      },
+
+                      {
+                        display_name:
+                          "Phone",
+
+                        variable_name:
+                          "phone",
+
+                        value:
+                          customer.phone
+                      }
+                    ]
+                  }
+                })
             }
           );
 
@@ -1139,7 +1238,8 @@ app.post(
         );
 
         return res.status(502).json({
-          error: e.message
+          error:
+            e.message
         });
       }
     } catch (e) {
@@ -1164,17 +1264,23 @@ async function markOrderPaid(
   reference,
   transactionId
 ) {
-  const order = await query(
-    "SELECT * FROM orders WHERE reference=$1",
-    [reference]
-  );
+  const order =
+    await query(
+      `SELECT *
+       FROM orders
+       WHERE reference=$1`,
+      [reference]
+    );
 
-  if (!order.rowCount) {
+  if (
+    !order.rowCount
+  ) {
     return;
   }
 
   if (
-    order.rows[0].payment_status ===
+    order.rows[0]
+      .payment_status ===
     "paid"
   ) {
     return;
@@ -1360,17 +1466,22 @@ app.post(
   "/api/admin/login",
   async (req, res) => {
     try {
-      const email = String(
-        req.body?.email || ""
-      )
-        .trim()
-        .toLowerCase();
+      const email =
+        String(
+          req.body?.email || ""
+        )
+          .trim()
+          .toLowerCase();
 
-      const password = String(
-        req.body?.password || ""
-      ).trim();
+      const password =
+        String(
+          req.body?.password || ""
+        ).trim();
 
-      if (!email || !password) {
+      if (
+        !email ||
+        !password
+      ) {
         return res.status(400).json({
           error:
             "Email and password are required."
@@ -1381,18 +1492,21 @@ app.post(
         `Admin login attempt: ${email}`
       );
 
-      const result = await query(
-        `SELECT
-           id,
-           email,
-           password_hash
-         FROM admins
-         WHERE LOWER(email) = $1
-         LIMIT 1`,
-        [email]
-      );
+      const result =
+        await query(
+          `SELECT
+             id,
+             email,
+             password_hash
+           FROM admins
+           WHERE LOWER(email) = $1
+           LIMIT 1`,
+          [email]
+        );
 
-      if (!result.rowCount) {
+      if (
+        !result.rowCount
+      ) {
         console.log(
           `Admin email not found: ${email}`
         );
@@ -1434,7 +1548,8 @@ app.post(
           JWT_SECRET,
 
           {
-            expiresIn: "8h"
+            expiresIn:
+              "8h"
           }
         );
 
@@ -1444,6 +1559,7 @@ app.post(
 
       return res.json({
         token,
+
         email:
           result.rows[0].email
       });
@@ -1463,6 +1579,7 @@ app.post(
 
 /* =========================================================
    ADMIN IMAGE UPLOAD
+   NO FILE SIZE LIMIT
 ========================================================= */
 
 app.post(
@@ -1474,8 +1591,15 @@ app.post(
       res,
       err => {
         if (err) {
+          console.error(
+            "Image upload error:",
+            err
+          );
+
           return res.status(400).json({
-            error: err.message
+            error:
+              err.message ||
+              "Unable to upload image."
           });
         }
 
@@ -1486,16 +1610,42 @@ app.post(
           });
         }
 
-        const imageUrl =
-          `data:${req.file.mimetype};base64,${req.file.buffer.toString(
-            "base64"
-          )}`;
+        try {
+          const imageUrl =
+            `data:${req.file.mimetype};base64,${req.file.buffer.toString(
+              "base64"
+            )}`;
 
-        res.json({
-          image_url: imageUrl,
-          filename:
-            req.file.originalname
-        });
+          console.log(
+            `Image uploaded: ${req.file.originalname} (${req.file.size} bytes)`
+          );
+
+          return res.json({
+            success: true,
+
+            image_url:
+              imageUrl,
+
+            filename:
+              req.file.originalname,
+
+            size:
+              req.file.size,
+
+            mimetype:
+              req.file.mimetype
+          });
+        } catch (error) {
+          console.error(
+            "Image processing error:",
+            error
+          );
+
+          return res.status(500).json({
+            error:
+              "Unable to process uploaded image."
+          });
+        }
       }
     );
   }
@@ -1517,63 +1667,71 @@ app.get(
         tailoring,
         students,
         revenue
-      ] = await Promise.all([
-        query(
-          `SELECT COUNT(*)::int AS count
-           FROM products
-           WHERE active=TRUE`
-        ),
+      ] =
+        await Promise.all([
+          query(
+            `SELECT COUNT(*)::int AS count
+             FROM products
+             WHERE active=TRUE`
+          ),
 
-        query(
-          `SELECT COUNT(*)::int AS count
-           FROM orders`
-        ),
+          query(
+            `SELECT COUNT(*)::int AS count
+             FROM orders`
+          ),
 
-        query(
-          `SELECT COUNT(*)::int AS count
-           FROM appointments
-           WHERE status='pending'`
-        ),
+          query(
+            `SELECT COUNT(*)::int AS count
+             FROM appointments
+             WHERE status='pending'`
+          ),
 
-        query(
-          `SELECT COUNT(*)::int AS count
-           FROM tailoring_requests
-           WHERE status='new'`
-        ),
+          query(
+            `SELECT COUNT(*)::int AS count
+             FROM tailoring_requests
+             WHERE status='new'`
+          ),
 
-        query(
-          `SELECT COUNT(*)::int AS count
-           FROM student_applications
-           WHERE status IN ('new','reviewing')`
-        ),
+          query(
+            `SELECT COUNT(*)::int AS count
+             FROM student_applications
+             WHERE status IN
+             ('new','reviewing')`
+          ),
 
-        query(
-          `SELECT COALESCE(
-             SUM(amount),0
-           )::int AS total
-           FROM orders
-           WHERE payment_status='paid'`
-        )
-      ]);
+          query(
+            `SELECT COALESCE(
+               SUM(amount),0
+             )::int AS total
+             FROM orders
+             WHERE payment_status='paid'`
+          )
+        ]);
 
       res.json({
         products:
-          products.rows[0].count,
+          products.rows[0]
+            .count,
 
         orders:
-          orders.rows[0].count,
+          orders.rows[0]
+            .count,
 
         pendingAppointments:
-          appointments.rows[0].count,
+          appointments.rows[0]
+            .count,
 
         tailoringRequests:
-          tailoring.rows[0].count,
+          tailoring.rows[0]
+            .count,
 
         studentApplications:
-          students.rows[0].count,
+          students.rows[0]
+            .count,
 
         revenue:
-          revenue.rows[0].total
+          revenue.rows[0]
+            .total
       });
     } catch (e) {
       console.error(e);
@@ -1595,13 +1753,16 @@ app.get(
   authRequired,
   async (req, res) => {
     try {
-      const result = await query(
-        `SELECT *
-         FROM products
-         ORDER BY created_at DESC`
-      );
+      const result =
+        await query(
+          `SELECT *
+           FROM products
+           ORDER BY created_at DESC`
+        );
 
-      res.json(result.rows);
+      res.json(
+        result.rows
+      );
     } catch (e) {
       console.error(e);
 
@@ -1634,59 +1795,77 @@ app.post(
         active
       } = req.body;
 
-      if (!name || !category) {
+      if (
+        !name ||
+        !category
+      ) {
         return res.status(400).json({
           error:
             "Name and category are required."
         });
       }
 
-      const result = await query(
-        `INSERT INTO products
-        (
-          name,
-          category,
-          gender,
-          product_type,
-          clothing_type,
-          price,
-          description,
-          sizes,
-          colors,
-          image_url,
-          featured,
-          stock,
-          active
-        )
-        VALUES
-        ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
-        RETURNING *`,
-        [
-          name,
-          category,
-          gender ||
-            "Unisex",
+      const result =
+        await query(
+          `INSERT INTO products
+          (
+            name,
+            category,
+            gender,
+            product_type,
+            clothing_type,
+            price,
+            description,
+            sizes,
+            colors,
+            image_url,
+            featured,
+            stock,
+            active
+          )
+          VALUES
+          (
+            $1,$2,$3,$4,$5,$6,$7,
+            $8,$9,$10,$11,$12,$13
+          )
+          RETURNING *`,
+          [
+            name,
 
-          product_type ||
-            "Ready-to-Wear",
+            category,
 
-          clothing_type ||
-            "Other",
+            gender ||
+              "Unisex",
 
-          Number(price) || 0,
+            product_type ||
+              "Ready-to-Wear",
 
-          description || "",
-          sizes || "",
-          colors || "",
-          image_url || "",
+            clothing_type ||
+              "Other",
 
-          !!featured,
+            Number(price) ||
+              0,
 
-          Number(stock) || 0,
+            description ||
+              "",
 
-          active !== false
-        ]
-      );
+            sizes ||
+              "",
+
+            colors ||
+              "",
+
+            image_url ||
+              "",
+
+            !!featured,
+
+            Number(stock) ||
+              0,
+
+            active !== false
+          ]
+        );
 
       res.status(201).json(
         result.rows[0]
@@ -1723,61 +1902,78 @@ app.put(
         active
       } = req.body;
 
-      if (!name || !category) {
+      if (
+        !name ||
+        !category
+      ) {
         return res.status(400).json({
           error:
             "Name and category are required."
         });
       }
 
-      const result = await query(
-        `UPDATE products
-         SET
-           name=$1,
-           category=$2,
-           gender=$3,
-           product_type=$4,
-           clothing_type=$5,
-           price=$6,
-           description=$7,
-           sizes=$8,
-           colors=$9,
-           image_url=$10,
-           featured=$11,
-           stock=$12,
-           active=$13
-         WHERE id=$14
-         RETURNING *`,
-        [
-          name,
-          category,
-          gender ||
-            "Unisex",
+      const result =
+        await query(
+          `UPDATE products
+           SET
+             name=$1,
+             category=$2,
+             gender=$3,
+             product_type=$4,
+             clothing_type=$5,
+             price=$6,
+             description=$7,
+             sizes=$8,
+             colors=$9,
+             image_url=$10,
+             featured=$11,
+             stock=$12,
+             active=$13
+           WHERE id=$14
+           RETURNING *`,
+          [
+            name,
 
-          product_type ||
-            "Ready-to-Wear",
+            category,
 
-          clothing_type ||
-            "Other",
+            gender ||
+              "Unisex",
 
-          Number(price) || 0,
+            product_type ||
+              "Ready-to-Wear",
 
-          description || "",
-          sizes || "",
-          colors || "",
-          image_url || "",
+            clothing_type ||
+              "Other",
 
-          !!featured,
+            Number(price) ||
+              0,
 
-          Number(stock) || 0,
+            description ||
+              "",
 
-          active !== false,
+            sizes ||
+              "",
 
-          req.params.id
-        ]
-      );
+            colors ||
+              "",
 
-      if (!result.rowCount) {
+            image_url ||
+              "",
+
+            !!featured,
+
+            Number(stock) ||
+              0,
+
+            active !== false,
+
+            req.params.id
+          ]
+        );
+
+      if (
+        !result.rowCount
+      ) {
         return res.status(404).json({
           error:
             "Product not found"
@@ -1803,14 +1999,17 @@ app.delete(
   authRequired,
   async (req, res) => {
     try {
-      const result = await query(
-        `DELETE FROM products
-         WHERE id=$1
-         RETURNING id`,
-        [req.params.id]
-      );
+      const result =
+        await query(
+          `DELETE FROM products
+           WHERE id=$1
+           RETURNING id`,
+          [req.params.id]
+        );
 
-      if (!result.rowCount) {
+      if (
+        !result.rowCount
+      ) {
         return res.status(404).json({
           error:
             "Product not found"
@@ -1819,6 +2018,7 @@ app.delete(
 
       res.json({
         success: true,
+
         deletedId:
           result.rows[0].id
       });
@@ -1842,13 +2042,16 @@ app.get(
   authRequired,
   async (req, res) => {
     try {
-      const result = await query(
-        `SELECT *
-         FROM orders
-         ORDER BY created_at DESC`
-      );
+      const result =
+        await query(
+          `SELECT *
+           FROM orders
+           ORDER BY created_at DESC`
+        );
 
-      res.json(result.rows);
+      res.json(
+        result.rows
+      );
     } catch (e) {
       console.error(e);
 
@@ -1919,14 +2122,17 @@ app.get(
   authRequired,
   async (req, res) => {
     try {
-      const result = await query(
-        `SELECT *
-         FROM appointments
-         ORDER BY appointment_date ASC,
-                  appointment_time ASC`
-      );
+      const result =
+        await query(
+          `SELECT *
+           FROM appointments
+           ORDER BY appointment_date ASC,
+                    appointment_time ASC`
+        );
 
-      res.json(result.rows);
+      res.json(
+        result.rows
+      );
     } catch (e) {
       console.error(e);
 
@@ -1994,13 +2200,16 @@ app.get(
   authRequired,
   async (req, res) => {
     try {
-      const result = await query(
-        `SELECT *
-         FROM tailoring_requests
-         ORDER BY created_at DESC`
-      );
+      const result =
+        await query(
+          `SELECT *
+           FROM tailoring_requests
+           ORDER BY created_at DESC`
+        );
 
-      res.json(result.rows);
+      res.json(
+        result.rows
+      );
     } catch (e) {
       console.error(e);
 
@@ -2069,13 +2278,16 @@ app.get(
   authRequired,
   async (req, res) => {
     try {
-      const result = await query(
-        `SELECT *
-         FROM student_applications
-         ORDER BY created_at DESC`
-      );
+      const result =
+        await query(
+          `SELECT *
+           FROM student_applications
+           ORDER BY created_at DESC`
+        );
 
-      res.json(result.rows);
+      res.json(
+        result.rows
+      );
     } catch (e) {
       console.error(e);
 
@@ -2137,6 +2349,30 @@ app.put(
 );
 
 /* =========================================================
+   GENERAL ERROR HANDLER
+========================================================= */
+
+app.use(
+  (err, req, res, next) => {
+    console.error(
+      "Unhandled server error:",
+      err
+    );
+
+    if (
+      res.headersSent
+    ) {
+      return next(err);
+    }
+
+    res.status(500).json({
+      error:
+        "Something went wrong on the server."
+    });
+  }
+);
+
+/* =========================================================
    FRONTEND FALLBACK
 ========================================================= */
 
@@ -2176,6 +2412,10 @@ initDb()
               ? "LOCAL"
               : "PRODUCTION"
           }`
+        );
+
+        console.log(
+          "Image upload size restriction: NONE"
         );
 
         console.log(
