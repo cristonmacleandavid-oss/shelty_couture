@@ -3,6 +3,11 @@
    Complete admin controller
    ========================================================= */
 
+
+/* =========================================================
+   ADMIN SESSION
+   ========================================================= */
+
 let token = localStorage.getItem("sheltyAdminToken");
 
 const $ = s => document.querySelector(s);
@@ -19,74 +24,138 @@ const api = async (url, opts = {}) => {
   opts.headers = {
     ...(opts.headers || {}),
     ...(!isLogin && token
-      ? { Authorization: `Bearer ${token}` }
+      ? {
+          Authorization: `Bearer ${token}`
+        }
       : {})
   };
 
   let res;
 
   try {
+
     res = await fetch(url, opts);
+
   } catch (err) {
+
     throw new Error(
       "Unable to connect to the server. Please check your internet connection."
     );
+
   }
 
-  /*
-    IMPORTANT:
-    Login must NOT receive the old token.
-    This fixes the "Session expired" login problem.
-  */
+
+  /* -------------------------------------------------------
+     AUTHENTICATION
+     ------------------------------------------------------- */
 
   if (res.status === 401) {
 
     if (!isLogin) {
+
       logout();
-      throw new Error("Your admin session has expired. Please sign in again.");
+
+      throw new Error(
+        "Your admin session has expired. Please sign in again."
+      );
+
     }
 
-    throw new Error("Invalid admin email or password.");
+    throw new Error(
+      "Invalid admin email or password."
+    );
+
   }
 
-  const contentType = res.headers.get("content-type") || "";
-  const raw = await res.text();
+
+  /* -------------------------------------------------------
+     READ RESPONSE
+     ------------------------------------------------------- */
+
+  const contentType =
+    res.headers.get("content-type") || "";
+
+  const raw =
+    await res.text();
 
   let data = null;
 
-  if (contentType.includes("application/json")) {
+
+  /* -------------------------------------------------------
+     JSON RESPONSE
+     ------------------------------------------------------- */
+
+  if (
+    contentType.includes(
+      "application/json"
+    )
+  ) {
 
     try {
-      data = raw ? JSON.parse(raw) : null;
+
+      data =
+        raw
+          ? JSON.parse(raw)
+          : null;
+
     } catch (err) {
-      throw new Error("The server returned invalid JSON.");
+
+      throw new Error(
+        "The server returned invalid JSON."
+      );
+
     }
 
-  } else {
+  }
 
-    const message = raw
-      .replace(/<[^>]*>/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
+
+  /* -------------------------------------------------------
+     NON JSON RESPONSE
+     ------------------------------------------------------- */
+
+  else {
+
+    const message =
+      raw
+        .replace(/<[^>]*>/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+
 
     if (!res.ok) {
+
       throw new Error(
-        message || `Request failed (${res.status})`
+        message ||
+        `Request failed (${res.status})`
       );
+
     }
+
 
     throw new Error(
       "The admin API returned an HTML page instead of JSON. Check the server route."
     );
+
   }
+
+
+  /* -------------------------------------------------------
+     API ERROR
+     ------------------------------------------------------- */
 
   if (!res.ok) {
+
     throw new Error(
-      data?.error || "Request failed."
+      data?.error ||
+      data?.message ||
+      "Request failed."
     );
+
   }
 
+
   return data;
+
 };
 
 
@@ -96,26 +165,48 @@ const api = async (url, opts = {}) => {
 
 function logout() {
 
-  localStorage.removeItem("sheltyAdminToken");
+  localStorage.removeItem(
+    "sheltyAdminToken"
+  );
 
   token = null;
 
-  const appView = $("#app-view");
-  const loginView = $("#login-view");
+
+  const appView =
+    $("#app-view");
+
+  const loginView =
+    $("#login-view");
+
 
   if (appView) {
-    appView.classList.add("hidden");
+
+    appView.classList.add(
+      "hidden"
+    );
+
   }
+
 
   if (loginView) {
-    loginView.classList.remove("hidden");
+
+    loginView.classList.remove(
+      "hidden"
+    );
+
   }
 
-  const error = $("#login-error");
+
+  const error =
+    $("#login-error");
+
 
   if (error) {
+
     error.textContent = "";
+
   }
+
 }
 
 
@@ -125,24 +216,69 @@ function logout() {
 
 function showApp() {
 
-  $("#login-view").classList.add("hidden");
+  const loginView =
+    $("#login-view");
 
-  $("#app-view").classList.remove("hidden");
+  const appView =
+    $("#app-view");
 
-  loadView("dashboard").catch(err => {
 
-    console.error("Dashboard loading error:", err);
+  if (loginView) {
 
-    if ($("#content")) {
-      $("#content").innerHTML = `
-        <div class="panel">
-          <h2>Unable to load dashboard</h2>
-          <p>${esc(err.message)}</p>
-          <button onclick="location.reload()">Refresh</button>
-        </div>
-      `;
-    }
-  });
+    loginView.classList.add(
+      "hidden"
+    );
+
+  }
+
+
+  if (appView) {
+
+    appView.classList.remove(
+      "hidden"
+    );
+
+  }
+
+
+  loadView("dashboard")
+    .catch(err => {
+
+      console.error(
+        "Dashboard loading error:",
+        err
+      );
+
+
+      if ($("#content")) {
+
+        $("#content").innerHTML = `
+
+          <div class="panel">
+
+            <h2>
+              Unable to load dashboard
+            </h2>
+
+            <p>
+              ${esc(err.message)}
+            </p>
+
+            <button
+              type="button"
+              onclick="location.reload()"
+            >
+              Refresh
+            </button>
+
+          </div>
+
+        `;
+
+      }
+
+    });
+
 }
 
 
@@ -150,108 +286,210 @@ function showApp() {
    LOGIN
    ========================================================= */
 
-$("#login-form").addEventListener("submit", async e => {
+const loginForm =
+  $("#login-form");
 
-  e.preventDefault();
 
-  const form = e.target;
+if (loginForm) {
 
-  const emailInput = form.elements.email;
-  const passwordInput = form.elements.password;
+  loginForm.addEventListener(
+    "submit",
+    async e => {
 
-  const loginError = $("#login-error");
+      e.preventDefault();
 
-  if (loginError) {
-    loginError.textContent = "";
-  }
 
-  /*
-    IMPORTANT:
-    Completely remove any old session before logging in.
-  */
+      const form =
+        e.target;
 
-  token = null;
 
-  localStorage.removeItem("sheltyAdminToken");
+      const emailInput =
+        form.elements.email;
 
-  const email = String(emailInput?.value || "").trim();
-  const password = String(passwordInput?.value || "");
 
-  if (!email || !password) {
+      const passwordInput =
+        form.elements.password;
 
-    if (loginError) {
-      loginError.textContent = "Please enter your email and password.";
-    }
 
-    return;
-  }
+      const loginError =
+        $("#login-error");
 
-  const button = form.querySelector("button");
 
-  if (button) {
-    button.disabled = true;
-    button.textContent = "Signing in...";
-  }
+      if (loginError) {
 
-  try {
+        loginError.textContent = "";
 
-    const d = await api("/api/admin/login", {
+      }
 
-      method: "POST",
 
-      headers: {
-        "Content-Type": "application/json"
-      },
+      /* ---------------------------------------------------
+         REMOVE OLD SESSION
+         --------------------------------------------------- */
 
-      body: JSON.stringify({
-        email,
-        password
-      })
-    });
+      token = null;
 
-    if (!d || !d.token) {
-      throw new Error(
-        "Login succeeded but no session token was returned."
+      localStorage.removeItem(
+        "sheltyAdminToken"
       );
+
+
+      const email =
+        String(
+          emailInput?.value || ""
+        ).trim();
+
+
+      const password =
+        String(
+          passwordInput?.value || ""
+        );
+
+
+      if (!email || !password) {
+
+        if (loginError) {
+
+          loginError.textContent =
+            "Please enter your email and password.";
+
+        }
+
+        return;
+
+      }
+
+
+      const button =
+        form.querySelector(
+          "button"
+        );
+
+
+      if (button) {
+
+        button.disabled = true;
+
+        button.textContent =
+          "Signing in...";
+
+      }
+
+
+      try {
+
+        const d =
+          await api(
+            "/api/admin/login",
+            {
+
+              method: "POST",
+
+              headers: {
+
+                "Content-Type":
+                  "application/json"
+
+              },
+
+              body:
+                JSON.stringify({
+
+                  email,
+
+                  password
+
+                })
+
+            }
+          );
+
+
+        if (
+          !d ||
+          !d.token
+        ) {
+
+          throw new Error(
+            "Login succeeded but no session token was returned."
+          );
+
+        }
+
+
+        token =
+          d.token;
+
+
+        localStorage.setItem(
+          "sheltyAdminToken",
+          token
+        );
+
+
+        if (loginError) {
+
+          loginError.textContent = "";
+
+        }
+
+
+        showApp();
+
+      }
+
+
+      catch (err) {
+
+        console.error(
+          "Admin login error:",
+          err
+        );
+
+
+        if (loginError) {
+
+          loginError.textContent =
+            err.message ||
+            "Unable to sign in.";
+
+        }
+
+      }
+
+
+      finally {
+
+        if (button) {
+
+          button.disabled = false;
+
+          button.textContent =
+            "Sign in";
+
+        }
+
+      }
+
     }
+  );
 
-    token = d.token;
-
-    localStorage.setItem(
-      "sheltyAdminToken",
-      token
-    );
-
-    if (loginError) {
-      loginError.textContent = "";
-    }
-
-    showApp();
-
-  } catch (err) {
-
-    console.error("Admin login error:", err);
-
-    if (loginError) {
-      loginError.textContent =
-        err.message || "Unable to sign in.";
-    }
-
-  } finally {
-
-    if (button) {
-      button.disabled = false;
-      button.textContent = "Sign in";
-    }
-  }
-});
+}
 
 
 /* =========================================================
    LOGOUT BUTTON
    ========================================================= */
 
-$("#logout").onclick = logout;
+const logoutButton =
+  $("#logout");
+
+
+if (logoutButton) {
+
+  logoutButton.onclick =
+    logout;
+
+}
 
 
 /* =========================================================
@@ -259,25 +497,45 @@ $("#logout").onclick = logout;
    ========================================================= */
 
 document
-  .querySelectorAll("[data-view]")
+  .querySelectorAll(
+    "[data-view]"
+  )
   .forEach(button => {
 
     button.onclick = () => {
 
-      loadView(button.dataset.view).catch(err => {
+      loadView(
+        button.dataset.view
+      )
+      .catch(err => {
 
         console.error(err);
 
+
         if ($("#content")) {
+
           $("#content").innerHTML = `
+
             <div class="panel">
-              <h2>Something went wrong</h2>
-              <p>${esc(err.message)}</p>
+
+              <h2>
+                Something went wrong
+              </h2>
+
+              <p>
+                ${esc(err.message)}
+              </p>
+
             </div>
+
           `;
+
         }
+
       });
+
     };
+
   });
 
 
@@ -289,49 +547,93 @@ async function loadView(view) {
 
   const titles = {
 
-    dashboard: "Dashboard",
+    dashboard:
+      "Dashboard",
 
-    products: "Products",
+    products:
+      "Products",
 
-    orders: "Orders",
+    orders:
+      "Orders",
 
-    appointments: "Appointments",
+    appointments:
+      "Appointments",
 
-    tailoring: "Custom Requests",
+    tailoring:
+      "Custom Requests",
 
-    students: "Student Applications"
+    students:
+      "Student Applications"
 
   };
 
-  $("#view-title").textContent =
-    titles[view] || "Dashboard";
 
-  window.currentView = view;
+  if ($("#view-title")) {
+
+    $("#view-title").textContent =
+      titles[view] ||
+      "Dashboard";
+
+  }
 
 
-  if (view === "dashboard") {
+  window.currentView =
+    view;
+
+
+  if (
+    view === "dashboard"
+  ) {
+
     return dashboard();
+
   }
 
-  if (view === "products") {
+
+  if (
+    view === "products"
+  ) {
+
     return products();
+
   }
 
-  if (view === "orders") {
+
+  if (
+    view === "orders"
+  ) {
+
     return orders();
+
   }
 
-  if (view === "appointments") {
+
+  if (
+    view === "appointments"
+  ) {
+
     return appointments();
+
   }
 
-  if (view === "tailoring") {
+
+  if (
+    view === "tailoring"
+  ) {
+
     return tailoring();
+
   }
 
-  if (view === "students") {
+
+  if (
+    view === "students"
+  ) {
+
     return students();
+
   }
+
 }
 
 
@@ -341,7 +643,10 @@ async function loadView(view) {
 
 function money(n) {
 
-  return `GHS ${Number(n || 0).toLocaleString()}`;
+  return `GHS ${Number(
+    n || 0
+  ).toLocaleString()}`;
+
 }
 
 
@@ -350,13 +655,63 @@ function esc(v = "") {
   return String(v).replace(
     /[&<>"']/g,
     x => ({
-      "&": "&amp;",
-      "<": "&lt;",
-      ">": "&gt;",
-      '"': "&quot;",
-      "'": "&#039;"
+
+      "&":
+        "&amp;",
+
+      "<":
+        "&lt;",
+
+      ">":
+        "&gt;",
+
+      '"':
+        "&quot;",
+
+      "'":
+        "&#039;"
+
     }[x])
+
   );
+
+}
+
+
+/* =========================================================
+   FILE SIZE HELPER
+   ========================================================= */
+
+function formatFileSize(bytes) {
+
+  if (!bytes) {
+
+    return "0 KB";
+
+  }
+
+
+  if (
+    bytes <
+    1024 * 1024
+  ) {
+
+    return (
+      (bytes / 1024)
+        .toFixed(1)
+      + " KB"
+    );
+
+  }
+
+
+  return (
+    (bytes /
+      (1024 * 1024))
+      .toFixed(1)
+    + " MB"
+  );
+
 }
 
 
@@ -366,54 +721,108 @@ function esc(v = "") {
 
 async function dashboard() {
 
-  const d = await api("/api/admin/summary");
+  const d =
+    await api(
+      "/api/admin/summary"
+    );
+
 
   $("#content").innerHTML = `
 
     <div class="stats">
 
       <div class="stat">
-        <b>${d.products}</b>
-        <span>Active products</span>
+
+        <b>
+          ${d.products}
+        </b>
+
+        <span>
+          Active products
+        </span>
+
       </div>
 
-      <div class="stat">
-        <b>${d.orders}</b>
-        <span>Total orders</span>
-      </div>
 
       <div class="stat">
-        <b>${d.pendingAppointments}</b>
-        <span>Pending appointments</span>
+
+        <b>
+          ${d.orders}
+        </b>
+
+        <span>
+          Total orders
+        </span>
+
       </div>
 
-      <div class="stat">
-        <b>${d.studentApplications}</b>
-        <span>Student applications</span>
-      </div>
 
       <div class="stat">
-        <b>${money(d.revenue)}</b>
-        <span>Paid revenue</span>
+
+        <b>
+          ${d.pendingAppointments}
+        </b>
+
+        <span>
+          Pending appointments
+        </span>
+
+      </div>
+
+
+      <div class="stat">
+
+        <b>
+          ${d.studentApplications}
+        </b>
+
+        <span>
+          Student applications
+        </span>
+
+      </div>
+
+
+      <div class="stat">
+
+        <b>
+          ${money(d.revenue)}
+        </b>
+
+        <span>
+          Paid revenue
+        </span>
+
       </div>
 
     </div>
 
+
     <div class="panel">
 
-      <h2>Atelier overview</h2>
+      <h2>
+        Atelier overview
+      </h2>
 
       <p>
+
         You have
-        <strong>${d.tailoringRequests}</strong>
+
+        <strong>
+          ${d.tailoringRequests}
+        </strong>
+
         new custom design requests.
+
         Use the menu to manage products,
         orders, appointments and enquiries.
+
       </p>
 
     </div>
 
   `;
+
 }
 
 
@@ -421,90 +830,247 @@ async function dashboard() {
    PRODUCT IMAGE UPLOAD
    ========================================================= */
 
+/*
+   Maximum image size on the admin side.
+
+   The server must also allow this size.
+*/
+
+const MAX_IMAGE_SIZE =
+  10 * 1024 * 1024;
+
+
+/*
+   Allowed image formats.
+*/
+
+const ALLOWED_IMAGE_TYPES = [
+
+  "image/jpeg",
+
+  "image/png",
+
+  "image/webp",
+
+  "image/gif"
+
+];
+
+
 async function uploadProductImage(file) {
 
   if (!file) {
+
     return null;
+
   }
 
-  const form = new FormData();
 
-  form.append("image", file);
+  /* -------------------------------------------------------
+     CHECK FILE TYPE
+     ------------------------------------------------------- */
+
+  if (
+    !ALLOWED_IMAGE_TYPES.includes(
+      file.type
+    )
+  ) {
+
+    throw new Error(
+      "Please upload a JPG, PNG, WEBP or GIF image."
+    );
+
+  }
+
+
+  /* -------------------------------------------------------
+     CHECK FILE SIZE
+     ------------------------------------------------------- */
+
+  if (
+    file.size >
+    MAX_IMAGE_SIZE
+  ) {
+
+    throw new Error(
+      `Image is too large. Maximum allowed size is 10MB. Your image is ${formatFileSize(file.size)}.`
+    );
+
+  }
+
+
+  const form =
+    new FormData();
+
+
+  form.append(
+    "image",
+    file
+  );
+
 
   let res;
 
+
   try {
 
-    res = await fetch(
-      "/api/admin/upload-image",
-      {
-        method: "POST",
+    res =
+      await fetch(
+        "/api/admin/upload-image",
+        {
 
-        headers: token
-          ? {
-              Authorization: `Bearer ${token}`
-            }
-          : {},
+          method: "POST",
 
-        body: form
-      }
-    );
+          headers:
+            token
+              ? {
+                  Authorization:
+                    `Bearer ${token}`
+                }
+              : {},
 
-  } catch (err) {
+          body:
+            form
+
+        }
+      );
+
+  }
+
+
+  catch (err) {
 
     throw new Error(
       "Unable to connect while uploading the image."
     );
+
   }
 
 
-  if (res.status === 401) {
+  /* -------------------------------------------------------
+     PAYLOAD TOO LARGE
+     ------------------------------------------------------- */
+
+  if (
+    res.status === 413
+  ) {
+
+    throw new Error(
+      "The image is too large for the server. Please use an image below 10MB."
+    );
+
+  }
+
+
+  /* -------------------------------------------------------
+     AUTHENTICATION
+     ------------------------------------------------------- */
+
+  if (
+    res.status === 401
+  ) {
 
     logout();
+
 
     throw new Error(
       "Your admin session has expired. Please sign in again."
     );
+
   }
 
 
   const contentType =
-    res.headers.get("content-type") || "";
+    res.headers.get(
+      "content-type"
+    ) || "";
 
-  const raw = await res.text();
+
+  const raw =
+    await res.text();
+
 
   let data = null;
 
-  if (contentType.includes("application/json")) {
+
+  /* -------------------------------------------------------
+     JSON RESPONSE
+     ------------------------------------------------------- */
+
+  if (
+    contentType.includes(
+      "application/json"
+    )
+  ) {
 
     try {
 
-      data = raw ? JSON.parse(raw) : null;
+      data =
+        raw
+          ? JSON.parse(raw)
+          : null;
 
-    } catch (err) {
+    }
+
+
+    catch (err) {
 
       throw new Error(
         "The image upload response was invalid."
       );
+
     }
 
-  } else {
-
-    throw new Error(
-      "Image upload returned an unexpected server response."
-    );
   }
 
+
+  /* -------------------------------------------------------
+     NON JSON RESPONSE
+     ------------------------------------------------------- */
+
+  else {
+
+    const message =
+      raw
+        .replace(/<[^>]*>/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+
+
+    throw new Error(
+      message ||
+      `Image upload failed (${res.status}).`
+    );
+
+  }
+
+
+  /* -------------------------------------------------------
+     SERVER ERROR
+     ------------------------------------------------------- */
 
   if (!res.ok) {
 
     throw new Error(
-      data?.error || "Image upload failed."
+      data?.error ||
+      data?.message ||
+      "Image upload failed."
     );
+
+  }
+
+
+  if (!data?.image_url) {
+
+    throw new Error(
+      "Image uploaded but the server did not return an image URL."
+    );
+
   }
 
 
   return data.image_url;
+
 }
 
 
@@ -514,11 +1080,14 @@ async function uploadProductImage(file) {
 
 async function products() {
 
-  const ps = await api(
-    "/api/admin/products"
-  );
+  const ps =
+    await api(
+      "/api/admin/products"
+    );
 
-  window.__adminProducts = ps;
+
+  window.__adminProducts =
+    ps;
 
 
   const clothingTypes = [
@@ -552,14 +1121,22 @@ async function products() {
   ];
 
 
-  const formFields = (p = {}) => `
+  /* =======================================================
+     PRODUCT FORM FIELDS
+     ======================================================= */
+
+  const formFields =
+    (p = {}) => `
 
     <label>
+
       Name
 
       <input
         name="name"
-        value="${esc(p.name || "")}"
+        value="${esc(
+          p.name || ""
+        )}"
         required
       >
 
@@ -570,7 +1147,9 @@ async function products() {
 
       Category
 
-      <select name="category">
+      <select
+        name="category"
+      >
 
         ${[
           "Women",
@@ -578,10 +1157,17 @@ async function products() {
           "African Wear",
           "Custom"
         ]
-          .map(x =>
-            `<option
-              ${p.category === x ? "selected" : ""}
-            >${x}</option>`
+          .map(
+            x =>
+              `<option
+                ${
+                  p.category === x
+                    ? "selected"
+                    : ""
+                }
+              >
+                ${x}
+              </option>`
           )
           .join("")}
 
@@ -594,17 +1180,26 @@ async function products() {
 
       Gender
 
-      <select name="gender">
+      <select
+        name="gender"
+      >
 
         ${[
           "Female",
           "Male",
           "Unisex"
         ]
-          .map(x =>
-            `<option
-              ${p.gender === x ? "selected" : ""}
-            >${x}</option>`
+          .map(
+            x =>
+              `<option
+                ${
+                  p.gender === x
+                    ? "selected"
+                    : ""
+                }
+              >
+                ${x}
+              </option>`
           )
           .join("")}
 
@@ -617,16 +1212,25 @@ async function products() {
 
       Product Type
 
-      <select name="product_type">
+      <select
+        name="product_type"
+      >
 
         ${[
           "Ready-to-Wear",
           "Customized"
         ]
-          .map(x =>
-            `<option
-              ${p.product_type === x ? "selected" : ""}
-            >${x}</option>`
+          .map(
+            x =>
+              `<option
+                ${
+                  p.product_type === x
+                    ? "selected"
+                    : ""
+                }
+              >
+                ${x}
+              </option>`
           )
           .join("")}
 
@@ -639,13 +1243,22 @@ async function products() {
 
       Clothing Type
 
-      <select name="clothing_type">
+      <select
+        name="clothing_type"
+      >
 
         ${clothingTypes
-          .map(x =>
-            `<option
-              ${p.clothing_type === x ? "selected" : ""}
-            >${x}</option>`
+          .map(
+            x =>
+              `<option
+                ${
+                  p.clothing_type === x
+                    ? "selected"
+                    : ""
+                }
+              >
+                ${x}
+              </option>`
           )
           .join("")}
 
@@ -661,8 +1274,11 @@ async function products() {
       <input
         type="number"
         min="0"
+        step="0.01"
         name="price"
-        value="${Number(p.price || 0)}"
+        value="${Number(
+          p.price || 0
+        )}"
       >
 
     </label>
@@ -676,7 +1292,9 @@ async function products() {
         type="number"
         min="0"
         name="stock"
-        value="${Number(p.stock || 0)}"
+        value="${Number(
+          p.stock || 0
+        )}"
       >
 
     </label>
@@ -688,7 +1306,9 @@ async function products() {
 
       <input
         name="sizes"
-        value="${esc(p.sizes || "")}"
+        value="${esc(
+          p.sizes || ""
+        )}"
         placeholder="S,M,L,XL"
       >
 
@@ -701,7 +1321,9 @@ async function products() {
 
       <input
         name="colors"
-        value="${esc(p.colors || "")}"
+        value="${esc(
+          p.colors || ""
+        )}"
         placeholder="Emerald, Ivory"
       >
 
@@ -718,15 +1340,24 @@ async function products() {
         accept="image/jpeg,image/png,image/webp,image/gif"
       >
 
+
       <input
         type="hidden"
         name="image_url"
-        value="${esc(p.image_url || "")}"
+        value="${esc(
+          p.image_url || ""
+        )}"
       >
 
+
       <small class="small-note">
+
         Choose an image from your computer.
-        Maximum 5MB.
+
+        Maximum 10MB.
+
+        JPG, PNG, WEBP or GIF.
+
       </small>
 
     </label>
@@ -739,7 +1370,9 @@ async function products() {
       <textarea
         name="description"
         rows="3"
-      >${esc(p.description || "")}</textarea>
+      >${esc(
+        p.description || ""
+      )}</textarea>
 
     </label>
 
@@ -749,7 +1382,11 @@ async function products() {
       <input
         type="checkbox"
         name="featured"
-        ${p.featured ? "checked" : ""}
+        ${
+          p.featured
+            ? "checked"
+            : ""
+        }
       >
 
       Featured
@@ -762,7 +1399,11 @@ async function products() {
       <input
         type="checkbox"
         name="active"
-        ${p.active !== false ? "checked" : ""}
+        ${
+          p.active !== false
+            ? "checked"
+            : ""
+        }
       >
 
       Active / visible on website
@@ -772,11 +1413,18 @@ async function products() {
   `;
 
 
+  /* =======================================================
+     PRODUCT PAGE
+     ======================================================= */
+
   $("#content").innerHTML = `
 
     <div class="panel">
 
-      <h2>Add a product</h2>
+      <h2>
+        Add a product
+      </h2>
+
 
       <p class="small-note">
 
@@ -797,6 +1445,7 @@ async function products() {
 
         ${formFields()}
 
+
         <button
           class="full"
           type="submit"
@@ -811,7 +1460,10 @@ async function products() {
 
     <div class="panel">
 
-      <h2>Catalogue</h2>
+      <h2>
+        Catalogue
+      </h2>
+
 
       <table class="data-table">
 
@@ -819,17 +1471,29 @@ async function products() {
 
           <tr>
 
-            <th>Product</th>
+            <th>
+              Product
+            </th>
 
-            <th>Classification</th>
+            <th>
+              Classification
+            </th>
 
-            <th>Price</th>
+            <th>
+              Price
+            </th>
 
-            <th>Stock</th>
+            <th>
+              Stock
+            </th>
 
-            <th>Visibility</th>
+            <th>
+              Visibility
+            </th>
 
-            <th>Actions</th>
+            <th>
+              Actions
+            </th>
 
           </tr>
 
@@ -841,34 +1505,51 @@ async function products() {
           ${
             ps.length
 
-              ? ps.map(p => `
+              ? ps
+                  .map(
+                    p => `
 
                 <tr>
 
                   <td>
 
-                    <div class="catalogue-product">
+                    <div
+                      class="catalogue-product"
+                    >
 
                       <img
                         src="${esc(
                           p.image_url ||
                           "/assets/shelty-logo.png"
                         )}"
-                        alt=""
+                        alt="${esc(
+                          p.name || "Product"
+                        )}"
                       >
+
 
                       <div>
 
                         <strong>
-                          ${esc(p.name)}
+                          ${esc(
+                            p.name
+                          )}
                         </strong>
+
 
                         <br>
 
+
                         <small>
+
                           ${esc(
-                            p.description || ""
-                          ).slice(0, 80)}
+                            p.description ||
+                            ""
+                          ).slice(
+                            0,
+                            80
+                          )}
+
                         </small>
 
                       </div>
@@ -881,7 +1562,8 @@ async function products() {
                   <td>
 
                     ${esc(
-                      p.gender || "Unisex"
+                      p.gender ||
+                      "Unisex"
                     )}
 
                     ·
@@ -891,11 +1573,16 @@ async function products() {
                       "Ready-to-Wear"
                     )}
 
+
                     <br>
+
 
                     <small>
 
-                      ${esc(p.category)}
+                      ${esc(
+                        p.category ||
+                        ""
+                      )}
 
                       ·
 
@@ -913,7 +1600,9 @@ async function products() {
 
                     ${
                       p.price
-                        ? money(p.price)
+                        ? money(
+                            p.price
+                          )
                         : "On request"
                     }
 
@@ -921,7 +1610,11 @@ async function products() {
 
 
                   <td>
-                    ${Number(p.stock || 0)}
+
+                    ${Number(
+                      p.stock || 0
+                    )}
+
                   </td>
 
 
@@ -942,7 +1635,9 @@ async function products() {
 
                   <td>
 
-                    <div class="actions">
+                    <div
+                      class="actions"
+                    >
 
                       <button
                         type="button"
@@ -967,13 +1662,17 @@ async function products() {
 
                 </tr>
 
-              `).join("")
+              `
+                  )
+                  .join("")
 
               : `
 
                 <tr>
 
-                  <td colspan="6">
+                  <td
+                    colspan="6"
+                  >
 
                     No products found.
 
@@ -991,16 +1690,27 @@ async function products() {
     </div>
 
 
+    <!-- ===================================================
+         EDIT PRODUCT MODAL
+         =================================================== -->
+
     <div
       id="edit-product-modal"
       class="edit-modal hidden"
     >
 
-      <div class="edit-card">
+      <div
+        class="edit-card"
+      >
 
-        <div class="edit-card-header">
+        <div
+          class="edit-card-header"
+        >
 
-          <h2>Edit product</h2>
+          <h2>
+            Edit product
+          </h2>
+
 
           <button
             type="button"
@@ -1023,7 +1733,9 @@ async function products() {
             name="id"
           >
 
+
           ${formFields()}
+
 
           <button
             class="full"
@@ -1045,109 +1757,158 @@ async function products() {
      ADD PRODUCT
      ======================================================= */
 
-  $("#product-form").onsubmit = async e => {
+  $("#product-form").onsubmit =
+    async e => {
 
-    e.preventDefault();
-
-    const form = e.target;
-
-    const button =
-      form.querySelector("button[type='submit']");
-
-    const originalText =
-      button?.textContent || "Add product";
+      e.preventDefault();
 
 
-    const o =
-      Object.fromEntries(
-        new FormData(form).entries()
-      );
+      const form =
+        e.target;
 
 
-    o.featured =
-      form.featured.checked;
-
-    o.active =
-      form.active.checked;
-
-    o.price =
-      Number(o.price || 0);
-
-    o.stock =
-      Number(o.stock || 0);
+      const button =
+        form.querySelector(
+          "button[type='submit']"
+        );
 
 
-    if (button) {
-
-      button.disabled = true;
-
-      button.textContent =
-        "Adding product...";
-
-    }
+      const originalText =
+        button?.textContent ||
+        "Add product";
 
 
-    try {
-
-      const file =
-        form.image_file.files[0];
-
-      const uploaded =
-        await uploadProductImage(file);
-
-
-      if (uploaded) {
-
-        o.image_url =
-          uploaded;
-
-      }
+      const o =
+        Object.fromEntries(
+          new FormData(
+            form
+          ).entries()
+        );
 
 
-      delete o.image_file;
+      o.featured =
+        form.featured.checked;
 
 
-      await api(
-        "/api/admin/products",
-        {
-          method: "POST",
-
-          headers: {
-            "Content-Type":
-              "application/json"
-          },
-
-          body:
-            JSON.stringify(o)
-        }
-      );
+      o.active =
+        form.active.checked;
 
 
-      alert(
-        "Product added successfully."
-      );
+      o.price =
+        Number(
+          o.price || 0
+        );
 
 
-      await products();
+      o.stock =
+        Number(
+          o.stock || 0
+        );
 
-
-    } catch (err) {
-
-      alert(err.message);
-
-    } finally {
 
       if (button) {
 
-        button.disabled = false;
+        button.disabled =
+          true;
 
         button.textContent =
-          originalText;
+          "Adding product...";
 
       }
-    }
 
-  };
+
+      try {
+
+        const file =
+          form.image_file?.files?.[0];
+
+
+        /*
+          Upload image first.
+        */
+
+        const uploaded =
+          await uploadProductImage(
+            file
+          );
+
+
+        if (uploaded) {
+
+          o.image_url =
+            uploaded;
+
+        }
+
+
+        /*
+          File itself must not be sent
+          to the JSON product endpoint.
+        */
+
+        delete o.image_file;
+
+
+        await api(
+          "/api/admin/products",
+          {
+
+            method: "POST",
+
+            headers: {
+
+              "Content-Type":
+                "application/json"
+
+            },
+
+            body:
+              JSON.stringify(o)
+
+          }
+        );
+
+
+        alert(
+          "Product added successfully."
+        );
+
+
+        await products();
+
+      }
+
+
+      catch (err) {
+
+        console.error(
+          "Add product error:",
+          err
+        );
+
+
+        alert(
+          err.message
+        );
+
+      }
+
+
+      finally {
+
+        if (button) {
+
+          button.disabled =
+            false;
+
+          button.textContent =
+            originalText;
+
+        }
+
+      }
+
+    };
 
 
   /* =======================================================
@@ -1159,14 +1920,22 @@ async function products() {
 
       e.preventDefault();
 
-      const form = e.target;
+
+      const form =
+        e.target;
+
 
       const o =
         Object.fromEntries(
-          new FormData(form).entries()
+          new FormData(
+            form
+          ).entries()
         );
 
-      const id = o.id;
+
+      const id =
+        o.id;
+
 
       delete o.id;
 
@@ -1174,20 +1943,28 @@ async function products() {
       o.featured =
         form.featured.checked;
 
+
       o.active =
         form.active.checked;
 
+
       o.price =
-        Number(o.price || 0);
+        Number(
+          o.price || 0
+        );
+
 
       o.stock =
-        Number(o.stock || 0);
+        Number(
+          o.stock || 0
+        );
 
 
       const button =
         form.querySelector(
           "button[type='submit']"
         );
+
 
       const originalText =
         button?.textContent ||
@@ -1196,7 +1973,8 @@ async function products() {
 
       if (button) {
 
-        button.disabled = true;
+        button.disabled =
+          true;
 
         button.textContent =
           "Saving...";
@@ -1207,10 +1985,19 @@ async function products() {
       try {
 
         const file =
-          form.image_file.files[0];
+          form.image_file?.files?.[0];
+
+
+        /*
+          Only upload an image if
+          the administrator selected
+          a new image.
+        */
 
         const uploaded =
-          await uploadProductImage(file);
+          await uploadProductImage(
+            file
+          );
 
 
         if (uploaded) {
@@ -1225,17 +2012,22 @@ async function products() {
 
 
         await api(
-          "/api/admin/products/" + id,
+          "/api/admin/products/" +
+          id,
           {
+
             method: "PUT",
 
             headers: {
+
               "Content-Type":
                 "application/json"
+
             },
 
             body:
               JSON.stringify(o)
+
           }
         );
 
@@ -1247,21 +2039,36 @@ async function products() {
 
         await products();
 
+      }
 
-      } catch (err) {
 
-        alert(err.message);
+      catch (err) {
 
-      } finally {
+        console.error(
+          "Update product error:",
+          err
+        );
+
+
+        alert(
+          err.message
+        );
+
+      }
+
+
+      finally {
 
         if (button) {
 
-          button.disabled = false;
+          button.disabled =
+            false;
 
           button.textContent =
             originalText;
 
         }
+
       }
 
     };
@@ -1273,48 +2080,62 @@ async function products() {
    EDIT PRODUCT
    ========================================================= */
 
-window.editProduct = id => {
+window.editProduct =
+  id => {
 
-  const row =
-    window.__adminProducts?.find(
-      p => p.id === id
-    );
-
-
-  if (row) {
-
-    return fillEditProduct(row);
-
-  }
+    const row =
+      window.__adminProducts?.find(
+        p =>
+          p.id === id
+      );
 
 
-  api("/api/admin/products")
+    if (row) {
 
-    .then(ps => {
+      return fillEditProduct(
+        row
+      );
 
-      window.__adminProducts =
-        ps;
+    }
 
-      const p =
-        ps.find(
-          x => x.id === id
+
+    api(
+      "/api/admin/products"
+    )
+
+      .then(ps => {
+
+        window.__adminProducts =
+          ps;
+
+
+        const p =
+          ps.find(
+            x =>
+              x.id === id
+          );
+
+
+        if (p) {
+
+          fillEditProduct(
+            p
+          );
+
+        }
+
+      })
+
+
+      .catch(err => {
+
+        alert(
+          err.message
         );
 
+      });
 
-      if (p) {
-
-        fillEditProduct(p);
-
-      }
-
-    })
-
-    .catch(err => {
-
-      alert(err.message);
-
-    });
-};
+  };
 
 
 /* =========================================================
@@ -1326,8 +2147,16 @@ function fillEditProduct(p) {
   const modal =
     $("#edit-product-modal");
 
+
   const form =
     $("#edit-product-form");
+
+
+  if (!modal || !form) {
+
+    return;
+
+  }
 
 
   form.id.value =
@@ -1335,21 +2164,34 @@ function fillEditProduct(p) {
 
 
   [
+
     "name",
+
     "category",
+
     "gender",
+
     "product_type",
+
     "clothing_type",
+
     "price",
+
     "stock",
+
     "sizes",
+
     "colors",
+
     "image_url",
+
     "description"
 
   ].forEach(k => {
 
-    if (form.elements[k]) {
+    if (
+      form.elements[k]
+    ) {
 
       form.elements[k].value =
         p[k] ?? "";
@@ -1370,6 +2212,7 @@ function fillEditProduct(p) {
   modal.classList.remove(
     "hidden"
   );
+
 }
 
 
@@ -1377,72 +2220,89 @@ function fillEditProduct(p) {
    CLOSE EDIT MODAL
    ========================================================= */
 
-window.closeEditProduct = () => {
+window.closeEditProduct =
+  () => {
 
-  $("#edit-product-modal")
-    ?.classList.add("hidden");
+    $("#edit-product-modal")
+      ?.classList.add(
+        "hidden"
+      );
 
-};
+  };
 
 
 /* =========================================================
    DELETE PRODUCT
    ========================================================= */
 
-window.deleteProduct = async id => {
+window.deleteProduct =
+  async id => {
 
-  const ps =
-    window.__adminProducts ||
-    await api("/api/admin/products");
-
-
-  const p =
-    ps.find(
-      x => x.id === id
-    );
+    const ps =
+      window.__adminProducts ||
+      await api(
+        "/api/admin/products"
+      );
 
 
-  if (!p) {
-    return;
-  }
+    const p =
+      ps.find(
+        x =>
+          x.id === id
+      );
 
 
-  if (
-    !confirm(
-      `Delete "${p.name}" permanently? This cannot be undone.`
-    )
-  ) {
+    if (!p) {
 
-    return;
+      return;
 
-  }
+    }
 
 
-  try {
+    if (
+      !confirm(
+        `Delete "${p.name}" permanently? This cannot be undone.`
+      )
+    ) {
 
-    await api(
-      "/api/admin/products/" + id,
-      {
-        method: "DELETE"
-      }
-    );
+      return;
 
-
-    alert(
-      "Product deleted successfully."
-    );
+    }
 
 
-    await products();
+    try {
+
+      await api(
+        "/api/admin/products/" +
+        id,
+        {
+
+          method:
+            "DELETE"
+
+        }
+      );
 
 
-  } catch (err) {
+      alert(
+        "Product deleted successfully."
+      );
 
-    alert(err.message);
 
-  }
+      await products();
 
-};
+    }
+
+
+    catch (err) {
+
+      alert(
+        err.message
+      );
+
+    }
+
+  };
 
 
 /* =========================================================
@@ -1452,32 +2312,51 @@ window.deleteProduct = async id => {
 async function orders() {
 
   const os =
-    await api("/api/admin/orders");
+    await api(
+      "/api/admin/orders"
+    );
 
 
   $("#content").innerHTML = `
 
     <div class="panel">
 
-      <h2>Orders</h2>
+      <h2>
+        Orders
+      </h2>
 
-      <table class="data-table">
+
+      <table
+        class="data-table"
+      >
 
         <thead>
 
           <tr>
 
-            <th>Reference</th>
+            <th>
+              Reference
+            </th>
 
-            <th>Customer</th>
+            <th>
+              Customer
+            </th>
 
-            <th>Items</th>
+            <th>
+              Items
+            </th>
 
-            <th>Amount</th>
+            <th>
+              Amount
+            </th>
 
-            <th>Payment</th>
+            <th>
+              Payment
+            </th>
 
-            <th>Order status</th>
+            <th>
+              Order status
+            </th>
 
           </tr>
 
@@ -1487,22 +2366,30 @@ async function orders() {
         <tbody>
 
           ${
-            os.map(o => `
+            os
+              .map(
+                o => `
 
               <tr>
 
                 <td>
 
                   <strong>
-                    ${esc(o.reference)}
+                    ${esc(
+                      o.reference
+                    )}
                   </strong>
+
 
                   <br>
 
+
                   <small>
+
                     ${new Date(
                       o.created_at
                     ).toLocaleString()}
+
                   </small>
 
                 </td>
@@ -1510,15 +2397,21 @@ async function orders() {
 
                 <td>
 
-                  ${esc(o.customer_name)}
+                  ${esc(
+                    o.customer_name
+                  )}
 
                   <br>
 
-                  ${esc(o.phone)}
+                  ${esc(
+                    o.phone
+                  )}
 
                   <br>
 
-                  ${esc(o.email)}
+                  ${esc(
+                    o.email
+                  )}
 
                 </td>
 
@@ -1528,23 +2421,33 @@ async function orders() {
                   ${(o.items || [])
                     .map(
                       i =>
-                        esc(i.name) +
+                        esc(
+                          i.name
+                        ) +
                         " × " +
                         i.quantity
                     )
-                    .join("<br>")}
+                    .join(
+                      "<br>"
+                    )}
 
                 </td>
 
 
                 <td>
-                  ${money(o.amount)}
+
+                  ${money(
+                    o.amount
+                  )}
+
                 </td>
 
 
                 <td>
 
-                  <span class="pill">
+                  <span
+                    class="pill"
+                  >
 
                     ${esc(
                       o.payment_status
@@ -1577,7 +2480,9 @@ async function orders() {
                                 ? "selected"
                                 : ""
                             }
-                          >${s}</option>`
+                          >
+                            ${s}
+                          </option>`
                       )
                       .join("")}
 
@@ -1587,7 +2492,9 @@ async function orders() {
 
               </tr>
 
-            `).join("")
+            `
+              )
+              .join("")
 
           }
 
@@ -1598,6 +2505,7 @@ async function orders() {
     </div>
 
   `;
+
 }
 
 
@@ -1606,7 +2514,10 @@ async function orders() {
    ========================================================= */
 
 window.setOrderStatus =
-  async (id, status) => {
+  async (
+    id,
+    status
+  ) => {
 
     try {
 
@@ -1615,23 +2526,33 @@ window.setOrderStatus =
         id +
         "/status",
         {
-          method: "PUT",
+
+          method:
+            "PUT",
 
           headers: {
+
             "Content-Type":
               "application/json"
+
           },
 
           body:
             JSON.stringify({
               status
             })
+
         }
       );
 
-    } catch (err) {
+    }
 
-      alert(err.message);
+
+    catch (err) {
+
+      alert(
+        err.message
+      );
 
     }
 
@@ -1654,23 +2575,38 @@ async function appointments() {
 
     <div class="panel">
 
-      <h2>Appointments</h2>
+      <h2>
+        Appointments
+      </h2>
 
-      <table class="data-table">
+
+      <table
+        class="data-table"
+      >
 
         <thead>
 
           <tr>
 
-            <th>Date</th>
+            <th>
+              Date
+            </th>
 
-            <th>Client</th>
+            <th>
+              Client
+            </th>
 
-            <th>Service</th>
+            <th>
+              Service
+            </th>
 
-            <th>Contact</th>
+            <th>
+              Contact
+            </th>
 
-            <th>Status</th>
+            <th>
+              Status
+            </th>
 
           </tr>
 
@@ -1680,7 +2616,9 @@ async function appointments() {
         <tbody>
 
           ${
-            a.map(x => `
+            a
+              .map(
+                x => `
 
               <tr>
 
@@ -1692,7 +2630,9 @@ async function appointments() {
                     )}
                   </strong>
 
+
                   <br>
+
 
                   ${esc(
                     x.appointment_time
@@ -1702,18 +2642,30 @@ async function appointments() {
 
 
                 <td>
-                  ${esc(x.name)}
+
+                  ${esc(
+                    x.name
+                  )}
+
                 </td>
 
 
                 <td>
 
-                  ${esc(x.service)}
+                  ${esc(
+                    x.service
+                  )}
+
 
                   <br>
 
+
                   <small>
-                    ${esc(x.message)}
+
+                    ${esc(
+                      x.message
+                    )}
+
                   </small>
 
                 </td>
@@ -1721,11 +2673,17 @@ async function appointments() {
 
                 <td>
 
-                  ${esc(x.phone)}
+                  ${esc(
+                    x.phone
+                  )}
+
 
                   <br>
 
-                  ${esc(x.email)}
+
+                  ${esc(
+                    x.email
+                  )}
 
                 </td>
 
@@ -1751,7 +2709,9 @@ async function appointments() {
                                 ? "selected"
                                 : ""
                             }
-                          >${s}</option>`
+                          >
+                            ${s}
+                          </option>`
                       )
                       .join("")}
 
@@ -1761,7 +2721,9 @@ async function appointments() {
 
               </tr>
 
-            `).join("")
+            `
+              )
+              .join("")
 
           }
 
@@ -1772,6 +2734,7 @@ async function appointments() {
     </div>
 
   `;
+
 }
 
 
@@ -1780,7 +2743,10 @@ async function appointments() {
    ========================================================= */
 
 window.setAppointmentStatus =
-  async (id, status) => {
+  async (
+    id,
+    status
+  ) => {
 
     try {
 
@@ -1789,23 +2755,33 @@ window.setAppointmentStatus =
         id +
         "/status",
         {
-          method: "PUT",
+
+          method:
+            "PUT",
 
           headers: {
+
             "Content-Type":
               "application/json"
+
           },
 
           body:
             JSON.stringify({
               status
             })
+
         }
       );
 
-    } catch (err) {
+    }
 
-      alert(err.message);
+
+    catch (err) {
+
+      alert(
+        err.message
+      );
 
     }
 
@@ -1832,21 +2808,34 @@ async function tailoring() {
         Custom Design Requests
       </h2>
 
-      <table class="data-table">
+
+      <table
+        class="data-table"
+      >
 
         <thead>
 
           <tr>
 
-            <th>Client</th>
+            <th>
+              Client
+            </th>
 
-            <th>Garment</th>
+            <th>
+              Garment
+            </th>
 
-            <th>Details</th>
+            <th>
+              Details
+            </th>
 
-            <th>Contact</th>
+            <th>
+              Contact
+            </th>
 
-            <th>Status</th>
+            <th>
+              Status
+            </th>
 
           </tr>
 
@@ -1856,12 +2845,18 @@ async function tailoring() {
         <tbody>
 
           ${
-            a.map(x => `
+            a
+              .map(
+                x => `
 
               <tr>
 
                 <td>
-                  ${esc(x.name)}
+
+                  ${esc(
+                    x.name
+                  )}
+
                 </td>
 
 
@@ -1871,7 +2866,9 @@ async function tailoring() {
                     x.garment_type
                   )}
 
+
                   <br>
+
 
                   ${esc(
                     x.occasion
@@ -1886,17 +2883,23 @@ async function tailoring() {
                     x.message
                   )}
 
+
                   <br>
+
 
                   <small>
 
                     Fabric:
-                    ${esc(x.fabric)}
+                    ${esc(
+                      x.fabric
+                    )}
 
                     ·
 
                     Budget:
-                    ${esc(x.budget)}
+                    ${esc(
+                      x.budget
+                    )}
 
                   </small>
 
@@ -1905,11 +2908,17 @@ async function tailoring() {
 
                 <td>
 
-                  ${esc(x.phone)}
+                  ${esc(
+                    x.phone
+                  )}
+
 
                   <br>
 
-                  ${esc(x.email)}
+
+                  ${esc(
+                    x.email
+                  )}
 
                 </td>
 
@@ -1936,7 +2945,9 @@ async function tailoring() {
                                 ? "selected"
                                 : ""
                             }
-                          >${s}</option>`
+                          >
+                            ${s}
+                          </option>`
                       )
                       .join("")}
 
@@ -1946,7 +2957,9 @@ async function tailoring() {
 
               </tr>
 
-            `).join("")
+            `
+              )
+              .join("")
 
           }
 
@@ -1957,6 +2970,7 @@ async function tailoring() {
     </div>
 
   `;
+
 }
 
 
@@ -1965,7 +2979,10 @@ async function tailoring() {
    ========================================================= */
 
 window.setTailoringStatus =
-  async (id, status) => {
+  async (
+    id,
+    status
+  ) => {
 
     try {
 
@@ -1974,23 +2991,33 @@ window.setTailoringStatus =
         id +
         "/status",
         {
-          method: "PUT",
+
+          method:
+            "PUT",
 
           headers: {
+
             "Content-Type":
               "application/json"
+
           },
 
           body:
             JSON.stringify({
               status
             })
+
         }
       );
 
-    } catch (err) {
+    }
 
-      alert(err.message);
+
+    catch (err) {
+
+      alert(
+        err.message
+      );
 
     }
 
@@ -2018,23 +3045,37 @@ async function students() {
       </h2>
 
 
-      <table class="data-table">
+      <table
+        class="data-table"
+      >
 
         <thead>
 
           <tr>
 
-            <th>Applicant</th>
+            <th>
+              Applicant
+            </th>
 
-            <th>Training</th>
+            <th>
+              Training
+            </th>
 
-            <th>Programme</th>
+            <th>
+              Programme
+            </th>
 
-            <th>Contact</th>
+            <th>
+              Contact
+            </th>
 
-            <th>Experience</th>
+            <th>
+              Experience
+            </th>
 
-            <th>Status</th>
+            <th>
+              Status
+            </th>
 
           </tr>
 
@@ -2044,24 +3085,38 @@ async function students() {
         <tbody>
 
           ${
-            a.map(x => `
+            a
+              .map(
+                x => `
 
               <tr>
 
                 <td>
 
                   <strong>
-                    ${esc(x.full_name)}
+                    ${esc(
+                      x.full_name
+                    )}
                   </strong>
 
-                  <br>
-
-                  ${esc(x.gender)}
 
                   <br>
+
+
+                  ${esc(
+                    x.gender
+                  )}
+
+
+                  <br>
+
 
                   <small>
-                    ${esc(x.city)}
+
+                    ${esc(
+                      x.city
+                    )}
+
                   </small>
 
                 </td>
@@ -2070,17 +3125,26 @@ async function students() {
                 <td>
 
                   <strong>
-                    ${esc(x.duration)}
+
+                    ${esc(
+                      x.duration
+                    )}
+
                   </strong>
+
 
                   <br>
 
+
                   <small>
+
                     Start:
+
                     ${esc(
                       x.start_date ||
                       "Not specified"
                     )}
+
                   </small>
 
                 </td>
@@ -2088,12 +3152,20 @@ async function students() {
 
                 <td>
 
-                  ${esc(x.program)}
+                  ${esc(
+                    x.program
+                  )}
+
 
                   <br>
+
 
                   <small>
-                    ${esc(x.message)}
+
+                    ${esc(
+                      x.message
+                    )}
+
                   </small>
 
                 </td>
@@ -2101,11 +3173,17 @@ async function students() {
 
                 <td>
 
-                  ${esc(x.phone)}
+                  ${esc(
+                    x.phone
+                  )}
+
 
                   <br>
 
-                  ${esc(x.email)}
+
+                  ${esc(
+                    x.email
+                  )}
 
                 </td>
 
@@ -2142,7 +3220,9 @@ async function students() {
                                 ? "selected"
                                 : ""
                             }
-                          >${s}</option>`
+                          >
+                            ${s}
+                          </option>`
                       )
                       .join("")}
 
@@ -2152,7 +3232,9 @@ async function students() {
 
               </tr>
 
-            `).join("")
+            `
+              )
+              .join("")
 
           }
 
@@ -2163,6 +3245,7 @@ async function students() {
     </div>
 
   `;
+
 }
 
 
@@ -2171,7 +3254,10 @@ async function students() {
    ========================================================= */
 
 window.setStudentStatus =
-  async (id, status) => {
+  async (
+    id,
+    status
+  ) => {
 
     try {
 
@@ -2180,23 +3266,33 @@ window.setStudentStatus =
         id +
         "/status",
         {
-          method: "PUT",
+
+          method:
+            "PUT",
 
           headers: {
+
             "Content-Type":
               "application/json"
+
           },
 
           body:
             JSON.stringify({
               status
             })
+
         }
       );
 
-    } catch (err) {
+    }
 
-      alert(err.message);
+
+    catch (err) {
+
+      alert(
+        err.message
+      );
 
     }
 
@@ -2211,11 +3307,19 @@ if (token) {
 
   showApp();
 
-} else {
+}
+
+else {
 
   $("#login-view")
-    ?.classList.remove("hidden");
+    ?.classList.remove(
+      "hidden"
+    );
+
 
   $("#app-view")
-    ?.classList.add("hidden");
+    ?.classList.add(
+      "hidden"
+    );
+
 }
